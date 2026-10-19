@@ -1,0 +1,14 @@
+# Arquivo de variáveis de ambiente com dados sensíveis
+.env
+
+# Ambiente virtual Python
+venv/
+.venv/
+
+# Cache do Python
+__pycache__/
+*.pyc
+
+# Banco de dados vetorial local do Chroma
+chroma_langchain/
+.chroma/
