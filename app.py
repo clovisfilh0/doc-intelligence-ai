@@ -8,7 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 import streamlit as st
 
-# Carregar variáveis de ambiente do arquivo .env (rodando localmente)
+# Carregar variáveis de ambiente (.env local)
 load_dotenv()
 
 # 1. Configuração da Página
@@ -18,14 +18,15 @@ st.set_page_config(
     layout="wide",
 )
 
-# 2. Inicialização do Histórico no Session State
+# 2. Inicialização do Session State
 if "messages" not in st.session_state:
   st.session_state["messages"] = []
+if "banco_vetorial" not in st.session_state:
+  st.session_state["banco_vetorial"] = None
+if "arquivo_atual" not in st.session_state:
+  st.session_state["arquivo_atual"] = None
 
-# 3. Lógica Segura para Obter a Chave da API (Sem exibir na tela)
-api_key_usuario = None
-
-# 4. Barra Lateral (Sidebar)
+# 3. Barra Lateral (Sidebar)
 with st.sidebar:
   st.image(
       "https://img.icons8.com/color/96/artificial-intelligence.png", width=64
@@ -45,7 +46,6 @@ with st.sidebar:
   st.divider()
   st.subheader("🔑 Configuração da IA (Google Gemini)")
 
-  # O campo de texto fica VAZIO por padrão. Nenhuma chave é injetada no 'value'
   api_key_input = st.text_input(
       "Chave da API do Google AI Studio (Opcional)",
       type="password",
@@ -56,19 +56,20 @@ with st.sidebar:
       ),
   )
 
-  # Resolução da chave nos bastidores:
+  # Resolução oculta da chave
   if api_key_input:
     google_api_key = api_key_input
   else:
-    # Tenta buscar nas Secrets do Streamlit Cloud ou no .env local
     try:
       google_api_key = st.secrets.get("GOOGLE_API_KEY")
     except Exception:
       google_api_key = os.getenv("GOOGLE_API_KEY")
 
-  # Botão para limpar a conversa
+  # Botão para limpar a conversa e resetar o arquivo
   if st.button("🗑️ Limpar Conversa"):
     st.session_state["messages"] = []
+    st.session_state["banco_vetorial"] = None
+    st.session_state["arquivo_atual"] = None
     st.rerun()
 
   st.divider()
@@ -101,10 +102,11 @@ def dividir_texto(texto):
 
 def criar_banco_vetorial(chunks):
   embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+  # Cria um banco vetorial novo em memória isolado na sessão do usuário
   return Chroma.from_texts(texts=chunks, embedding=embeddings)
 
 
-# 5. Área Principal do Aplicativo
+# 4. Área Principal do Aplicativo
 st.title("📄 Assistente Inteligente de Documentos")
 st.markdown("""
 Converse com os seus documentos em tempo real. Faça perguntas, peça resumos e analise informações com o poder da **IA Generativa**.
@@ -114,21 +116,20 @@ st.divider()
 
 # Processamento do arquivo PDF enviado
 if uploaded_file:
-  if (
-      "arquivo_atual" not in st.session_state
-      or st.session_state["arquivo_atual"] != uploaded_file.name
-  ):
+  # Se for um arquivo novo ou diferente do anterior, reseta o banco e o histórico
+  if st.session_state["arquivo_atual"] != uploaded_file.name:
     with st.spinner("🔄 Processando, fatiando e vetorizando o documento..."):
       texto_extraido = extrair_texto_pdf(uploaded_file)
       chunks = dividir_texto(texto_extraido)
+
+      # Reseta completamente o banco antigo antes de criar o novo
       st.session_state["banco_vetorial"] = criar_banco_vetorial(chunks)
       st.session_state["arquivo_atual"] = uploaded_file.name
-      st.session_state["messages"] = (
-          []
-      )  # Reset no histórico se mudar de arquivo
+      st.session_state["messages"] = []  # Reseta o histórico de mensagens
+
     st.sidebar.success(f"✅ Processado: {uploaded_file.name}")
 
-# Mensagens de orientação iniciais
+# Mensagens de orientação
 if not uploaded_file:
   st.info(
       "👈 **Para começar:** Faça o upload de um arquivo PDF na barra lateral."
@@ -139,7 +140,7 @@ elif not google_api_key:
       " inserida na barra lateral."
   )
 else:
-  # 6. Renderizar o histórico de mensagens existente
+  # Renderizar o histórico de mensagens da sessão atual
   for message in st.session_state["messages"]:
     with st.chat_message(message["role"]):
       st.markdown(message["content"])
@@ -148,7 +149,7 @@ else:
           for idx, fonte in enumerate(message["sources"], 1):
             st.markdown(f"**Trecho {idx}:**\n_{fonte}_")
 
-  # 7. Campo de entrada estilo Chat (st.chat_input)
+  # Campo de entrada do chat
   if user_prompt := st.chat_input(
       "Pergunte algo sobre o documento carregado..."
   ):
