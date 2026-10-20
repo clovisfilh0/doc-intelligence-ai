@@ -7,6 +7,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 import streamlit as st
+import uuid
+from chromadb.config import Settings
 
 # Carregar variáveis de ambiente (.env local)
 load_dotenv()
@@ -102,8 +104,14 @@ def dividir_texto(texto):
 
 def criar_banco_vetorial(chunks):
   embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-  # Cria um banco vetorial novo em memória isolado na sessão do usuário
-  return Chroma.from_texts(texts=chunks, embedding=embeddings)
+
+  # Gera um nome único para a coleção deste PDF específico
+  colecao_unica = f"pdf_{uuid.uuid4().hex}"
+
+  # Força o Chroma a criar uma coleção totalmente nova e isolada
+  return Chroma.from_texts(
+      texts=chunks, embedding=embeddings, collection_name=colecao_unica
+  )
 
 
 # 4. Área Principal do Aplicativo
