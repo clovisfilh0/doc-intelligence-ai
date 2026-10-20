@@ -172,7 +172,7 @@ else:
           contexto = "\n\n".join(trechos_fonte)
 
           llm = ChatGoogleGenerativeAI(
-              model="models/gemini-1.5-flash",
+              model="gemini-3.8-flash",
               temperature=0.3,
               google_api_key=google_api_key,
           )
